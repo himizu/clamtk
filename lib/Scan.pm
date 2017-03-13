@@ -63,6 +63,11 @@ sub filter {
     my ( $pkg_name, $scanthis, $show, $from ) = @_;
     $from_cli = $from;
 
+    # Process of multibyte character from commandline [include nautilus addon]
+    if ( $from eq 'startup' ) {
+        $scanthis = decode('utf8', $scanthis);
+    }
+
     # Currently just to test permissions:
     # If given a file/directory from the commandline
     # AND we can't scan it, just die.
@@ -535,8 +540,15 @@ sub logit {
     my $REPORT;    # filehandle for histories log
 
     #<<<
-    my ( $mon, $day, $year )
-        = split / /, strftime( '%b %d %Y', localtime );
+    # Problem only for ja_JP.UTF-8 ??
+    # Save localtime of current locale with separator [ - ]
+    # Remove < space > of head of a line [ s/^ // ]
+    # < space > : Head of a line of Abbreviated month name(%b)
+    my $ldate = strftime( '%b-%d-%Y', localtime );
+    $ldate =~ s/^ //;
+
+    # Separate data of $ldate [ split /-/ ]
+    my ( $mon, $day, $year ) = split( /-/, $ldate );
 
     # Save date of scan
     if ( $found_count > 0 ) {
@@ -549,8 +561,19 @@ sub logit {
     my %prefs = ClamTk::Prefs->get_all_prefs();
     my $paths = ClamTk::App->get_path( 'history' );
 
-    my $virus_log
-        = $paths . "/" . decode( 'utf8', "$mon-$day-$year" ) . '.log';
+    my $virus_log;        # Histories log file name
+    my $plver = $];       # Save perl Ver [ x.xxxxxx ] of system
+    $plver =~ s/\.//g;    # Remove all Dot < . > of $plver [ s/\.//g ]
+
+    # Fix decode error from Perl Ver 5.22
+    # "$mon-$day-$year" : Perl Ver >= 5.22 ( 5022000 )
+    # decode( 'utf8', "$mon-$day-$year" ) : Perl Ver < 5.22 ( 5022000 )
+    if ( $plver >= 5022000 ) {
+        $virus_log = $paths . "/" . "$mon-$day-$year" . '.log';
+    } else {
+        $virus_log
+            = $paths . "/" . decode( 'utf8', "$mon-$day-$year" ) . '.log';
+    }
 
     #<<<
     # sort the directories scanned for display
